@@ -16,6 +16,7 @@ if 'count' not in st.session_state:
 if st.button("Hello"):
     # Increment count locally
     st.session_state.count += 1
+    print("Hello")
 
     try:
         # Update count in Supabase
