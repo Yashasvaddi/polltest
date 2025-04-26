@@ -1,44 +1,39 @@
 import streamlit as st
-import psycopg2
+from supabase import create_client, Client
 
-# Your Supabase connection string
-conn_str = "postgresql://postgres:Yash@2017@db.ywikpplsoviaonplwagr.supabase.co:5432/postgres"
+# Your Supabase URL and API Key
+url = "https://ywikpplsoviaonplwagr.supabase.co"
+key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3aWtwcGxzb3ZpYW9ucGx3YWdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU2NTAwNDQsImV4cCI6MjA2MTIyNjA0NH0.yk7K8XgARwovwqKwlqwvE-c3rrJmp_MkEvniNarb8BE"  # Replace with your Supabase key
 
-# Connect to Supabase Postgres
-conn = psycopg2.connect(conn_str)
-cursor = conn.cursor()
+# Create a Supabase client
+supabase = create_client(url, key)
 
-# Create table if it doesn't exist
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS click_counter (
-        id SERIAL PRIMARY KEY,
-        count INTEGER
-    );
-""")
-conn.commit()
+# Initialize count in session state if it doesn't exist
+if 'count' not in st.session_state:
+    st.session_state.count = 0
 
-# Check if a count row exists
-cursor.execute("SELECT count FROM click_counter WHERE id = 1;")
-row = cursor.fetchone()
-
-# If not, insert initial value
-if row is None:
-    cursor.execute("INSERT INTO click_counter (id, count) VALUES (1, 0);")
-    conn.commit()
-    count = 0
-else:
-    count = row[0]
-
-# Display count
-st.write(f"Button clicked {count} times.")
-
-# On click, update the count
+# Button and counter logic
 if st.button("Hello"):
-    new_count = count + 1
-    cursor.execute("UPDATE click_counter SET count = %s WHERE id = 1;", (new_count,))
-    conn.commit()
-    st.experimental_rerun()
+    # Increment count locally
+    st.session_state.count += 1
 
-# Close connection
-cursor.close()
-conn.close()
+    try:
+        # Update count in Supabase
+        supabase.table('click').upsert(
+            {'id': 1, 'count': st.session_state.count},
+            on_conflict=['id']  # Assuming 'id' is a unique key in your table
+        ).execute()
+        st.success("Count updated in the database.")
+    except Exception as e:
+        st.error(f"Failed to update count: {e}")
+
+# Display the count
+st.write(f"Button Clicked {st.session_state.count} times.")
+
+# Fetch the count from Supabase (optional, for syncing with the database)
+try:
+    result = supabase.table('click').select('count').eq('id', 1).execute()
+    if result.data:
+        st.session_state.count = result.data[0]['count']  # Update local count with the value from DB
+except Exception as e:
+    st.error(f"Failed to fetch count from database: {e}")
