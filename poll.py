@@ -1,5 +1,6 @@
 import streamlit as st
 from supabase import create_client, Client
+import time
 
 # Your Supabase URL and API Key
 url = "https://ywikpplsoviaonplwagr.supabase.co"
@@ -30,10 +31,16 @@ if st.button("Hello"):
 # Display the count
 st.write(f"Button Clicked {st.session_state.count} times.")
 
-# Fetch the count from Supabase (optional, for syncing with the database)
-try:
-    result = supabase.table('click').select('count').eq('id', 1).execute()
-    if result.data:
-        st.session_state.count = result.data[0]['count']  # Update local count with the value from DB
-except Exception as e:
-    st.error(f"Failed to fetch count from database: {e}")
+# Poll for changes in the database and rerun the app
+while True:
+    time.sleep(5)  # Check every 5 seconds
+
+    try:
+        result = supabase.table('click').select('count').eq('id', 1).execute()
+        if result.data:
+            new_count = result.data[0]['count']
+            if new_count != st.session_state.count:
+                st.session_state.count = new_count  # Update local count with the value from DB
+                st.experimental_rerun()  # Rerun the app to reflect the change
+    except Exception as e:
+        st.error(f"Failed to fetch count from database: {e}")
